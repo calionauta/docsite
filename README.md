@@ -1,7 +1,8 @@
 # docsite
 
 One docs-site engine, vendored into each project, with the layout rules enforced
-by a browser test. Zero dependencies at build time: node stdlib only.
+by a browser test. Zero npm dependencies at build time: node stdlib plus one
+vendored JavaScript search library.
 
 The point is not the CSS. The point is that a fix lands **here once** and every
 project picks it up with a version bump, and that no project can ship a page
@@ -11,10 +12,19 @@ rendered page at phone, tablet and desktop widths.
 ## What a project gets
 
 - `site/build.mjs` — markdown → static HTML, `llms.txt`, `llms-full.txt`,
-  `sitemap.xml`, and one article page per release section.
+  `sitemap.xml`, one article page per release section, and the search index.
 - `site/releases.mjs` — the CHANGELOG → release-article renderer.
-- `scripts/site-layout.test.mjs` — Chromium test over every page at nine widths.
+- `site/search.mjs` — build-time index builder and page hooks.
+- `site/search/search.js` — the browser palette, keyboard handling and results.
+- `site/search/minisearch.js` — vendored MiniSearch (MIT), no npm install and no
+  other-language binary.
+- `scripts/site-layout.test.mjs` — Chromium test over every page at nine widths,
+  plus one search smoke.
 - `site/docsite.config.mjs` — the only project-specific file.
+
+The search index is written to `site/search/index.json` at build time. That file
+is generated: add `site/search/index.json` to the project's `.gitignore`; the
+three search assets above are committed and drift-checked.
 
 The landing page is not generated. Marketing pages stay hand-written in
 `site/index.html`; the test measures them when they exist.
@@ -56,6 +66,20 @@ test before the upload step, so a clipped page cannot ship.
 | `releases` | no | `{file, origin, repo, tagPrefix}` per CHANGELOG source |
 | `strictManifestLinks` | no | `false` allows `.md` files inside `docs/` that are not published |
 | `landingMenuBelow` | no | width at which the landing menu must appear; 620 by default |
+| `search` | no | `false` disables the search button, index and smoke; enabled by default |
+
+## Search
+
+Search is lexical, not semantic: MiniSearch indexes each manifest page's title,
+headings and text at build time. The browser loads the index on first use, then
+searches with prefix matching, edit-distance fuzzy matching and title/heading
+boosts. It needs no server, no WASM and no Rust binary.
+
+Open it with the sidebar button, the mobile topbar button, `/` outside an input,
+or `Ctrl/Cmd+K`. Results link to the rendered page.
+
+Set `search: false` in the config when a project does not want the palette; the
+build then skips the index and the layout test skips its search smoke.
 
 ## The landing page
 
@@ -92,6 +116,8 @@ holds it to two rules:
 - every table region has `role`, an `aria-label`, and `tabindex` only when it
   actually scrolls; every header cell has `scope="col"`; every cell carries the
   `data-label` the stacked layout prints
+- the docs index opens the search palette and a term from its first page returns
+  a result
 
 ## Pin, drift and bump
 
@@ -102,11 +128,10 @@ workflow runs:
 scripts/check-drift.sh
 ```
 
-which compares the three vendored files against that commit on GitHub and fails
-when they differ. To move to a newer upstream commit, run `scripts/bump.sh` (re-vendors from
-upstream `main` and moves the pin), then commit the four files with the SHA
-change. Treat the vendored files as read-only: a local edit is drift the check
-will flag.
+which compares the vendored files against that commit on GitHub and fails when
+they differ. To move to a newer upstream commit, run `scripts/bump.sh` (re-vendors
+from upstream `main` and moves the pin), then commit the vendored files with the
+SHA change. Treat them as read-only: a local edit is drift the check will flag.
 
 A weekly PR can do the bump for you. Note that a PR opened with `GITHUB_TOKEN`
 does not trigger other workflows; close and reopen it once, or dispatch the
