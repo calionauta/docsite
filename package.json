@@ -1,0 +1,11 @@
+{
+  "name": "docsite",
+  "private": true,
+  "description": "Zero-dependency docs site engine + layout contract, vendored into calionauta projects.",
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  },
+  "scripts": {
+    "test": "bash scripts/self-test.sh"
+  }
+}
