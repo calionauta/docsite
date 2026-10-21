@@ -100,7 +100,7 @@ function pages() {
   const sitemap = readFileSync(join(SITE, "sitemap.xml"), "utf8");
   const docs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)]
     .map((m) => new URL(m[1]).pathname.replace(PREFIX, ""))
-    .filter((u) => /^\/docs\/[^/]+\/$/.test(u))
+    .filter((u) => /^\/docs\/.+\/$/.test(u))
     .sort();
   // A landing page is project-specific and optional; when it exists, its
   // navigation and command blocks are measured too.
