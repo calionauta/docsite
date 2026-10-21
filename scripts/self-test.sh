@@ -8,7 +8,7 @@ cp -R "$root/fixtures/demo/." "$work/"
 mkdir -p "$work/site/search" "$work/scripts"
 cp "$root/src/build.mjs" "$root/src/releases.mjs" "$root/src/search.mjs" "$work/site/"
 cp "$root/src/search.js" "$work/site/search/search.js"
-cp "$root/src/vendor/minisearch.js" "$root/src/vendor/MINISEARCH-LICENSE.txt" "$work/site/search/"
+cp "$root/src/vendor/minisearch.js" "$root/src/vendor/package.json" "$root/src/vendor/MINISEARCH-LICENSE.txt" "$work/site/search/"
 cp "$root/src/site-layout.test.mjs" "$work/scripts/"
 cd "$work"
 node site/build.mjs

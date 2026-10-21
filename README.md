@@ -17,7 +17,8 @@ rendered page at phone, tablet and desktop widths.
 - `site/search.mjs` — build-time index builder and page hooks.
 - `site/search/search.js` — the browser palette, keyboard handling and results.
 - `site/search/minisearch.js` — vendored MiniSearch (MIT), no npm install and no
-  other-language binary.
+  other-language binary. `site/search/package.json` scopes it as CommonJS for
+  projects whose package is `type: module`.
 - `scripts/site-layout.test.mjs` — Chromium test over every page at nine widths,
   plus one search smoke.
 - `site/docsite.config.mjs` — the only project-specific file.

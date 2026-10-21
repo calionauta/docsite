@@ -10,6 +10,7 @@
 #   src/search.mjs            -> <project>/site/search.mjs
 #   src/search.js             -> <project>/site/search/search.js
 #   src/vendor/minisearch.js  -> <project>/site/search/minisearch.js
+#   src/vendor/package.json   -> <project>/site/search/package.json
 #   src/vendor/MINISEARCH-*   -> <project>/site/search/
 #   src/site-layout.test.mjs  -> <project>/scripts/site-layout.test.mjs
 #   scripts/check-drift.sh    -> <project>/scripts/check-docsite-drift.sh
@@ -38,6 +39,7 @@ cp "$root/src/search.mjs" "$target/site/search.mjs"
 mkdir -p "$target/site/search"
 cp "$root/src/search.js" "$target/site/search/search.js"
 cp "$root/src/vendor/minisearch.js" "$target/site/search/minisearch.js"
+cp "$root/src/vendor/package.json" "$target/site/search/package.json"
 cp "$root/src/vendor/MINISEARCH-LICENSE.txt" "$target/site/search/MINISEARCH-LICENSE.txt"
 cp "$root/src/site-layout.test.mjs" "$target/scripts/site-layout.test.mjs"
 cp "$root/scripts/check-drift.sh" "$target/scripts/check-docsite-drift.sh"
