@@ -22,7 +22,14 @@ curl -fsSL "$raw/src/vendor/minisearch.js" -o "$target/site/search/minisearch.js
 curl -fsSL "$raw/src/vendor/MINISEARCH-LICENSE.txt" -o "$target/site/search/MINISEARCH-LICENSE.txt"
 curl -fsSL "$raw/src/site-layout.test.mjs" -o "$target/scripts/site-layout.test.mjs"
 curl -fsSL "$raw/scripts/check-drift.sh" -o "$target/scripts/check-docsite-drift.sh"
-curl -fsSL "$raw/scripts/bump.sh" -o "$target/scripts/bump-docsite.sh"
+# Download the new bump script to a temp file and move it into place: writing
+# over the script bash is currently reading truncates it mid-run (“unexpected
+# EOF”), because curl opens the same inode. A rename swaps the path, not the
+# open descriptor, so this run finishes on the old bytes.
+tmp_bump=$(mktemp)
+trap 'rm -f "$tmp_bump"' EXIT
+curl -fsSL "$raw/scripts/bump.sh" -o "$tmp_bump"
+mv "$tmp_bump" "$target/scripts/bump-docsite.sh"
 chmod +x "$target/scripts/check-docsite-drift.sh" "$target/scripts/bump-docsite.sh"
 printf '%s\n' "$sha" > "$target/site/UPSTREAM_SHA"
 echo "✓ vendored $upstream@$sha"
