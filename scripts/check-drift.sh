@@ -41,6 +41,8 @@ check() {
 check src/build.mjs "$root/site/build.mjs"
 check src/releases.mjs "$root/site/releases.mjs"
 check src/site-layout.test.mjs "$root/scripts/site-layout.test.mjs"
+# The checker is vendored too: an edited checker could hide every other drift.
+check scripts/check-drift.sh "$root/scripts/check-docsite-drift.sh"
 
 if [ "$fail" -ne 0 ]; then
 	echo "" >&2

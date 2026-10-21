@@ -8,6 +8,7 @@
 #   src/build.mjs            -> <project>/site/build.mjs
 #   src/releases.mjs         -> <project>/site/releases.mjs
 #   src/site-layout.test.mjs -> <project>/scripts/site-layout.test.mjs
+#   scripts/check-drift.sh   -> <project>/scripts/check-docsite-drift.sh
 # Writes <project>/site/UPSTREAM_SHA.
 #
 # It never overwrites site/docsite.config.mjs: that file belongs to the project.
@@ -17,12 +18,20 @@ target="${1:?usage: scripts/install.sh /path/to/project [sha]}"
 root=$(cd "$(dirname "$0")/.." && pwd)
 sha="${2:-$(git -C "$root" rev-parse HEAD 2>/dev/null || echo unknown)}"
 
+# Vendoring a dirty tree would pin a SHA that does not contain what was copied.
+if [ -z "${2:-}" ] && ! git -C "$root" diff --quiet; then
+	echo "refusing to vendor from a dirty checkout; commit or pass a SHA explicitly" >&2
+	exit 1
+fi
+
 [ -d "$target" ] || { echo "no such directory: $target" >&2; exit 1; }
 mkdir -p "$target/site" "$target/scripts"
 
 cp "$root/src/build.mjs" "$target/site/build.mjs"
 cp "$root/src/releases.mjs" "$target/site/releases.mjs"
 cp "$root/src/site-layout.test.mjs" "$target/scripts/site-layout.test.mjs"
+cp "$root/scripts/check-drift.sh" "$target/scripts/check-docsite-drift.sh"
+chmod +x "$target/scripts/check-docsite-drift.sh"
 printf '%s\n' "$sha" > "$target/site/UPSTREAM_SHA"
 
 if [ ! -f "$target/site/docsite.config.mjs" ]; then

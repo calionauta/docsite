@@ -28,7 +28,8 @@ scripts/install.sh ../my-project          # copies the engine + test, pins the S
 $EDITOR ../my-project/site/docsite.config.mjs
 ```
 
-`install.sh` writes `site/UPSTREAM_SHA`. Commit it. From then on:
+`install.sh` copies the engine, the layout test and the drift checker, and writes
+`site/UPSTREAM_SHA`. Commit them. From then on:
 
 ```sh
 node site/build.mjs            # build
@@ -56,6 +57,18 @@ test before the upload step, so a clipped page cannot ship.
 | `strictManifestLinks` | no | `false` allows `.md` files inside `docs/` that are not published |
 | `landingMenuBelow` | no | width at which the landing menu must appear; 620 by default |
 
+## The landing page
+
+The landing stays hand-written. If `site/index.html` exists, the layout test
+holds it to two rules:
+
+- a `<details class="mobile-menu">` with the section links, visible at and below
+  `landingMenuBelow` (620 by default). Below that width the header links no
+  longer fit, and without the menu a phone has no navigation.
+- no `<pre>` scrolls horizontally: wrap commands with
+  `white-space: pre-wrap; overflow-wrap: anywhere` and reserve the copy button's
+  gutter with `padding-right`, or the button lands on top of the command.
+
 ## The contract
 
 `site-layout.test.mjs` fails when any of these is untrue:
@@ -80,6 +93,39 @@ scripts/check-drift.sh
 ```
 
 which compares the three vendored files against that commit on GitHub and fails
-when they differ. To move to a newer upstream commit, re-run `scripts/install.sh`
-and commit the result with the SHA change. Treat the vendored files as read-only:
-a local edit is drift the check will flag.
+when they differ. To move to a newer upstream commit, run `scripts/bump.sh` (re-vendors from
+upstream `main` and moves the pin), then commit the four files with the SHA
+change. Treat the vendored files as read-only: a local edit is drift the check
+will flag.
+
+A weekly PR can do the bump for you. Copy this into the consumer repo as
+`.github/workflows/docsite-bump.yml`:
+
+```yaml
+name: docsite bump
+on:
+  schedule: [{ cron: "0 7 * * 1" }]
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/bump-docsite.sh
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet; then echo "already current"; exit 0; fi
+          sha=$(cat site/UPSTREAM_SHA)
+          git config user.name "docsite-bot"
+          git config user.email "docsite-bot@users.noreply.github.com"
+          git checkout -b docsite/bump
+          git commit -am "chore(site): bump docsite to $sha"
+          git push -u origin docsite/bump --force
+          gh pr create --title "chore(site): bump docsite to $sha" \
+            --body "Re-vendors the docs engine at $sha. Review the diff and the layout test; the engine is not edited here." \
+            || true
+```
