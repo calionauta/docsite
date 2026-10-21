@@ -43,6 +43,9 @@ const STACK_BELOW = 820;
 const FIT_VIEWPORT = 1440;
 const MAX_SCROLL_RATIO = 0.25;
 const MEASURE = { min: 560, max: 700 }; // prose line box, px (see --measure)
+// The landing menu appears when the primary links are hidden; that breakpoint
+// is a project choice (620 for a compact header, 900 when links vanish early).
+const LANDING_MENU_BELOW = CONFIG.landingMenuBelow ?? 620;
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -188,8 +191,8 @@ try {
         if (vw === 1440 && !r.sidebar) fail(`${where}: desktop sidebar missing at 1440px`);
       }
       if (path === "/") {
-        if (vw <= 620 && !r.landingMenu) fail(`${where}: no landing menu on a phone`);
-        if (vw > 620 && r.landingMenu) fail(`${where}: landing menu still shown at ${vw}px`);
+        if (vw <= LANDING_MENU_BELOW && !r.landingMenu) fail(`${where}: no landing menu at ${vw}px`);
+        if (vw > LANDING_MENU_BELOW && r.landingMenu) fail(`${where}: landing menu still shown at ${vw}px`);
         if (vw <= 900 && r.preOver > 0) fail(`${where}: a command block scrolls ${r.preOver}px instead of wrapping`);
       }
       // Structure once per page is enough; the attributes come from the builder.

@@ -54,6 +54,7 @@ test before the upload step, so a clipped page cannot ship.
 | `manifest` | yes | `{group, slug, file, desc}` per page; slugs are stable URLs |
 | `releases` | no | `{file, origin, repo, tagPrefix}` per CHANGELOG source |
 | `strictManifestLinks` | no | `false` allows `.md` files inside `docs/` that are not published |
+| `landingMenuBelow` | no | width at which the landing menu must appear; 620 by default |
 
 ## The contract
 
