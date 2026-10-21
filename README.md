@@ -69,6 +69,16 @@ holds it to two rules:
   `white-space: pre-wrap; overflow-wrap: anywhere` and reserve the copy button's
   gutter with `padding-right`, or the button lands on top of the command.
 
+## Migrating a hand-written builder
+
+1. Extract the page list from the old `site/build.mjs` into
+   `site/docsite.config.mjs` first (`manifest` and `releases`); the engine no
+   longer carries it.
+2. Run `scripts/install.sh .` and commit the vendored files with the pin.
+3. Build before and after if you can, and diff the output: the engine should
+   render the same pages. If it differs, the old builder had a fork that has to
+   go upstream, not into the config.
+
 ## The contract
 
 `site-layout.test.mjs` fails when any of these is untrue:
@@ -98,8 +108,10 @@ upstream `main` and moves the pin), then commit the four files with the SHA
 change. Treat the vendored files as read-only: a local edit is drift the check
 will flag.
 
-A weekly PR can do the bump for you. Copy this into the consumer repo as
-`.github/workflows/docsite-bump.yml`:
+A weekly PR can do the bump for you. Note that a PR opened with `GITHUB_TOKEN`
+does not trigger other workflows; close and reopen it once, or dispatch the
+layout workflow manually, so the test runs before the merge. Copy this into the
+consumer repo as `.github/workflows/docsite-bump.yml`:
 
 ```yaml
 name: docsite bump
