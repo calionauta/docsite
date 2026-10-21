@@ -9,6 +9,7 @@
 #   src/releases.mjs         -> <project>/site/releases.mjs
 #   src/site-layout.test.mjs -> <project>/scripts/site-layout.test.mjs
 #   scripts/check-drift.sh   -> <project>/scripts/check-docsite-drift.sh
+#   scripts/bump.sh          -> <project>/scripts/bump-docsite.sh
 # Writes <project>/site/UPSTREAM_SHA.
 #
 # It never overwrites site/docsite.config.mjs: that file belongs to the project.
@@ -31,7 +32,8 @@ cp "$root/src/build.mjs" "$target/site/build.mjs"
 cp "$root/src/releases.mjs" "$target/site/releases.mjs"
 cp "$root/src/site-layout.test.mjs" "$target/scripts/site-layout.test.mjs"
 cp "$root/scripts/check-drift.sh" "$target/scripts/check-docsite-drift.sh"
-chmod +x "$target/scripts/check-docsite-drift.sh"
+cp "$root/scripts/bump.sh" "$target/scripts/bump-docsite.sh"
+chmod +x "$target/scripts/check-docsite-drift.sh" "$target/scripts/bump-docsite.sh"
 printf '%s\n' "$sha" > "$target/site/UPSTREAM_SHA"
 
 if [ ! -f "$target/site/docsite.config.mjs" ]; then

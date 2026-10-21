@@ -28,8 +28,8 @@ scripts/install.sh ../my-project          # copies the engine + test, pins the S
 $EDITOR ../my-project/site/docsite.config.mjs
 ```
 
-`install.sh` copies the engine, the layout test and the drift checker, and writes
-`site/UPSTREAM_SHA`. Commit them. From then on:
+`install.sh` copies the engine, the layout test, the drift checker and the bump
+script, and writes `site/UPSTREAM_SHA`. Commit them. From then on:
 
 ```sh
 node site/build.mjs            # build
