@@ -11,8 +11,9 @@ rendered page at phone, tablet and desktop widths.
 
 ## What a project gets
 
-- `site/build.mjs` — markdown → static HTML, `llms.txt`, `llms-full.txt`,
-  `sitemap.xml`, one article page per release section, and the search index.
+- `site/build.mjs` — markdown → static HTML, one **markdown copy per page**
+  (`docs/<slug>.md`, for agents), `llms.txt`, `llms-full.txt`, `sitemap.xml`, one
+  article page per release section, and the search index.
 - `site/releases.mjs` — the CHANGELOG → release-article renderer.
 - `site/search.mjs` — build-time index builder and page hooks.
 - `site/search/search.js` — the browser palette, keyboard handling and results.
@@ -21,6 +22,9 @@ rendered page at phone, tablet and desktop widths.
   projects whose package is `type: module`.
 - `scripts/site-layout.test.mjs` — Chromium test over every page at nine widths,
   plus one search smoke.
+- `scripts/markdown-mirror.test.mjs` — the copy contract: every published page
+  has a `docs/<slug>.md`, one title, live links, its page URL, an `llms.txt`
+  entry and a sitemap entry. No browser needed.
 - `site/docsite.config.mjs` — the only project-specific file.
 
 The search index is written to `site/search/index.json` at build time. That file
@@ -43,8 +47,9 @@ $EDITOR ../my-project/site/docsite.config.mjs
 script, and writes `site/UPSTREAM_SHA`. Commit them. From then on:
 
 ```sh
-node site/build.mjs            # build
-node site/build.mjs --check    # links + anchors only, no writes
+node site/build.mjs                 # build
+node site/build.mjs --check         # links + anchors only, no writes
+node scripts/markdown-mirror.test.mjs
 node scripts/site-layout.test.mjs
 ```
 
@@ -65,9 +70,66 @@ test before the upload step, so a clipped page cannot ship.
 | `outDir` | no | `site` |
 | `manifest` | yes | `{group, slug, file, desc}` per page; slugs are stable URLs |
 | `releases` | no | `{file, origin, repo, tagPrefix}` per CHANGELOG source |
-| `strictManifestLinks` | no | `false` allows `.md` files inside `docs/` that are not published |
+| `unpublishedDirs` | no | `["domain/", "migrations/"]` — `docs/` subdirectories that are deliberately repo-facing. Every other `.md` under `docs/` must be in the manifest, or the build fails |
+| `unpublishedFiles` | no | single pages kept repo-facing (`"SECURITY.md"`); same rule as `unpublishedDirs`, for a file that has no directory of its own |
+| `description` | no | one-line site description; used for `<meta name="description">` on pages without a `desc`, for the `llms.txt` blurb, and for release pages |
+| `socialPreview` | no | absolute or root-relative image URL, rendered as `og:image` and as a `summary_large_image` card |
 | `landingMenuBelow` | no | width at which the landing menu must appear; 620 by default |
 | `search` | no | `false` disables the search button, index and smoke; enabled by default |
+
+## Agent surface
+
+Three surfaces, each for a different question:
+
+| Surface | Answers | Cost |
+|---|---|---|
+| `/llms.txt` | "what exists?" — one line per page, with its site URL and its markdown copy | 20 KB |
+| `/<slug>.md` | "read this one page" — the page's own markdown, links rewritten to sibling copies | one page |
+| `/llms-full.txt` | "give me everything" — every page concatenated, `Source:` naming the site URL | 1 MB+ |
+
+The per-page copy is the important one, and it is why a markdown mirror exists at
+all. `llms-full.txt` used to be the only machine surface, so an agent that wanted
+one page paid for the whole site, and its `Source:` lines named repo-relative
+paths (`docs/overview.md`) that **404 on the site** — a raw dump pretending to be
+a URL. A copy is a real file, so it needs no rewrite rule, no `Accept:
+text/markdown` negotiation, and no server: it works on GitHub Pages, on a local
+`file://` path, and from any HTTP client.
+
+Each page carries a `view markdown` link next to the content, and the copy is in
+the sitemap. Both surfaces render from **one** renderer: the copy is produced by
+re-rendering the page body with link rewriting aimed at the copies, then turned
+back into markdown. A second parser would be a second thing to fix.
+
+Two rules keep the surface honest, and both fail the build rather than warn:
+
+- every `.md` under `docs/` is either published in the manifest or declared in
+  `unpublishedDirs` / `unpublishedFiles`. A page nobody publishes and nobody
+  declares reaches no reader at all, and that used to be silent;
+- when the project keeps a curated `llms.txt` at the repository root (the file an
+  agent is told to read first), every published page must be named in it. Two
+  agent indexes with nothing comparing them is how a page stays published and
+  unreachable for months.
+
+## Page metadata
+
+Every page gets `rel=canonical`, `og:title`, `og:type`, `og:url`, `og:site_name`,
+`twitter:card`, and — when the manifest entry has a `desc`, or the config has a
+`description` — `description` plus the matching `og:`/`twitter:` pair and an
+`og:image` from `socialPreview`. Before this, a page's head was a `<title>` and
+nothing else, so 80+ pages were unindexable with an unused description sitting
+beside them in the manifest, and a shared link had no title, description or
+image at all.
+
+Release pages describe themselves with the release entry's own lede.
+
+## Images
+
+Images are resolved against the repository, not the site: the builder copies no
+assets into `site/`, so a relative `![](shot.png)` is broken on **both** surfaces
+(the page renders it under `/docs/<slug>/`, the copy at the site root, and
+neither directory holds the file). `![...](shot.png)` becomes
+`https://github.com/<repo>/raw/<branch>/<path>`, which renders on both and needs
+no copying step to drift.
 
 ## Search
 
@@ -119,6 +181,26 @@ holds it to two rules:
   `data-label` the stacked layout prints
 - the docs index opens the search palette and a term from its first page returns
   a result
+
+## The markdown-mirror contract
+
+`markdown-mirror.test.mjs` fails when any of these is untrue, for every manifest
+page:
+
+- a copy was emitted, opens with the page's title, and has exactly **one** H1
+- the copy keeps its page-URL breadcrumb, and every relative link in it names a
+  file the build emitted
+- no image in the copy has a site-relative URL
+- no list collapsed onto one line (the items are adjacent in the HTML, so the
+  parser has to split them) and no blank line splits a table
+- the page has `rel=canonical` pointing at itself, the OG/Twitter pair, and the
+  manifest `desc` in its description
+- `llms.txt` names the copy, `llms-full.txt` names the **site** URL once per
+  page, and the sitemap carries the copy
+
+`self-test.sh` additionally proves both build rules by making them fail: an
+unpublished, undeclared `docs/*.md` and a published page missing from a curated
+`llms.txt` must each stop the build.
 
 ## Pin, drift and bump
 

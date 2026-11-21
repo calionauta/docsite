@@ -13,6 +13,7 @@
 #   src/vendor/package.json   -> <project>/site/search/package.json
 #   src/vendor/MINISEARCH-*   -> <project>/site/search/
 #   src/site-layout.test.mjs  -> <project>/scripts/site-layout.test.mjs
+#   src/markdown-mirror.test.mjs -> <project>/scripts/markdown-mirror.test.mjs
 #   scripts/check-drift.sh    -> <project>/scripts/check-docsite-drift.sh
 #   scripts/bump.sh           -> <project>/scripts/bump-docsite.sh
 # Writes <project>/site/UPSTREAM_SHA.
@@ -42,6 +43,7 @@ cp "$root/src/vendor/minisearch.js" "$target/site/search/minisearch.js"
 cp "$root/src/vendor/package.json" "$target/site/search/package.json"
 cp "$root/src/vendor/MINISEARCH-LICENSE.txt" "$target/site/search/MINISEARCH-LICENSE.txt"
 cp "$root/src/site-layout.test.mjs" "$target/scripts/site-layout.test.mjs"
+cp "$root/src/markdown-mirror.test.mjs" "$target/scripts/markdown-mirror.test.mjs"
 cp "$root/scripts/check-drift.sh" "$target/scripts/check-docsite-drift.sh"
 cp "$root/scripts/bump.sh" "$target/scripts/bump-docsite.sh"
 chmod +x "$target/scripts/check-docsite-drift.sh" "$target/scripts/bump-docsite.sh"
