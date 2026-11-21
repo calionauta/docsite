@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 (2026-01-03)
+
+## What's Changed
+* a github-type entry by @example in https://github.com/example/demo/pull/3
+
+## New Contributors
+* @newbie made their first contribution in https://github.com/example/demo/pull/3
+
+**Full Changelog**: https://github.com/example/demo/compare/v0.2.0...v0.3.0
+
 ## [0.2.0](https://github.com/example/demo/compare/v0.1.0...v0.2.0) (2026-01-02)
 
 ### Features
