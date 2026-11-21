@@ -12,7 +12,7 @@ rendered page at phone, tablet and desktop widths.
 ## What a project gets
 
 - `site/build.mjs` — markdown → static HTML, one **markdown copy per page**
-  (`<slug>.md`, for agents), `llms.txt`, `llms-full.txt`, `sitemap.xml`, one
+  (`docs/<slug>.md`, for agents), `llms.txt`, `llms-full.txt`, `sitemap.xml`, one
   article page per release section, and the search index.
 - `site/releases.mjs` — the CHANGELOG → release-article renderer.
 - `site/search.mjs` — build-time index builder and page hooks.
@@ -22,8 +22,9 @@ rendered page at phone, tablet and desktop widths.
   projects whose package is `type: module`.
 - `scripts/site-layout.test.mjs` — Chromium test over every page at nine widths,
   plus one search smoke.
-- `scripts/markdown-mirror.test.mjs` — build-artifact contract over the markdown
-  copies and the per-page head metadata. No browser.
+- `scripts/markdown-mirror.test.mjs` — the copy contract: every published page
+  has a `docs/<slug>.md`, one title, live links, its page URL, an `llms.txt`
+  entry and a sitemap entry. No browser needed.
 - `site/docsite.config.mjs` — the only project-specific file.
 
 The search index is written to `site/search/index.json` at build time. That file
@@ -46,8 +47,9 @@ $EDITOR ../my-project/site/docsite.config.mjs
 script, and writes `site/UPSTREAM_SHA`. Commit them. From then on:
 
 ```sh
-node site/build.mjs            # build
-node site/build.mjs --check    # links + anchors only, no writes
+node site/build.mjs                 # build
+node site/build.mjs --check         # links + anchors only, no writes
+node scripts/markdown-mirror.test.mjs
 node scripts/site-layout.test.mjs
 ```
 
@@ -69,6 +71,7 @@ test before the upload step, so a clipped page cannot ship.
 | `manifest` | yes | `{group, slug, file, desc}` per page; slugs are stable URLs |
 | `releases` | no | `{file, origin, repo, tagPrefix}` per CHANGELOG source |
 | `unpublishedDirs` | no | `["domain/", "migrations/"]` — `docs/` subdirectories that are deliberately repo-facing. Every other `.md` under `docs/` must be in the manifest, or the build fails |
+| `unpublishedFiles` | no | single pages kept repo-facing (`"SECURITY.md"`); same rule as `unpublishedDirs`, for a file that has no directory of its own |
 | `description` | no | one-line site description; used for `<meta name="description">` on pages without a `desc`, for the `llms.txt` blurb, and for release pages |
 | `socialPreview` | no | absolute or root-relative image URL, rendered as `og:image` and as a `summary_large_image` card |
 | `landingMenuBelow` | no | width at which the landing menu must appear; 620 by default |
@@ -100,8 +103,8 @@ back into markdown. A second parser would be a second thing to fix.
 Two rules keep the surface honest, and both fail the build rather than warn:
 
 - every `.md` under `docs/` is either published in the manifest or declared in
-  `unpublishedDirs`. A page nobody publishes and nobody declares reaches no
-  reader at all, and that used to be silent;
+  `unpublishedDirs` / `unpublishedFiles`. A page nobody publishes and nobody
+  declares reaches no reader at all, and that used to be silent;
 - when the project keeps a curated `llms.txt` at the repository root (the file an
   agent is told to read first), every published page must be named in it. Two
   agent indexes with nothing comparing them is how a page stays published and

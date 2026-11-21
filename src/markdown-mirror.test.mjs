@@ -12,7 +12,7 @@
 // Run: node src/markdown-mirror.test.mjs [project-root]
 // No browser and no playwright: this is a build-artifact contract.
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const ROOT = resolve(process.argv[2] || process.cwd());
@@ -26,11 +26,15 @@ const cfg = (await import(pathToFileURL(join(SITE, "docsite.config.mjs")).href))
 const pages = cfg.manifest.map((p) => ({ slug: p.slug, file: p.file, desc: p.desc }));
 
 for (const p of pages) {
-  const copy = join(SITE, `${p.slug}.md`);
+  // Copies sit beside their page URL: site/docs/<slug>.md.
+  const copy = join(SITE, "docs", `${p.slug}.md`);
   if (!existsSync(copy)) { bad(`${p.slug}.md was not emitted`); continue; }
   const md = readFileSync(copy, "utf8");
   if (!md.startsWith("# ")) bad(`${p.slug}.md does not open with its title`);
-  if ((md.match(/^# /gm) || []).length !== 1) bad(`${p.slug}.md has more than one H1`);
+  // Count H1s OUTSIDE fenced blocks: a shell snippet whose comment starts with
+  // `# ` is not a second title, and three real pages proved it.
+  const prose = md.split(/^\s*```/m).filter((_, i) => i % 2 === 0).join("\n");
+  if ((prose.match(/^# /gm) || []).length !== 1) bad(`${p.slug}.md has more than one H1`);
   if (!md.includes("<!-- page: http")) bad(`${p.slug}.md lost its page URL breadcrumb`);
   // An image URL emitted as a file name is a broken image in every copy: that is
   // the exact bug the rewrite guard in build.mjs exists for.
@@ -39,13 +43,18 @@ for (const p of pages) {
   }
   // A link to a sibling must name a file the build emitted.
   for (const m of md.matchAll(/\]\((?!https?:|#|mailto:)([^)#]+\.md)(#[^)]*)?\)/g)) {
-    if (!existsSync(join(SITE, m[1]))) bad(`${p.slug}.md links ${m[1]}, which was not emitted`);
+    // Copies live at docs/<slug>.md, so a sibling target is relative to THAT
+    // directory, not to the site root: a nested slug walks back its own depth.
+    if (!existsSync(resolve(dirname(copy), m[1]))) {
+      bad(`${p.slug}.md links ${m[1]}, which was not emitted`);
+    }
   }
   // A list collapsed onto one line is a rendering bug, not a style choice: the
   // items are adjacent in the rendered HTML and the parser has to split them,
   // which leaves the second item's dash glued to the first item's last word.
-  const prose = md.split("```").filter((_, i) => i % 2 === 0).join("\n");
-  if (/^- [^\n]*\S- /m.test(prose)) bad(`${p.slug}.md glued several list items onto one line`);
+  // The signature is a sentence end immediately followed by a marker (`run.- `).
+  // `--` inside a code span is not one, which is why this is not `\S- `.
+  if (/\.- \S/.test(prose)) bad(`${p.slug}.md glued several list items onto one line`);
   // A blank line inside a table ends it: the rows after it render as text.
   const tableRun = prose.split("\n");
   for (let i = 1; i < tableRun.length - 1; i++) {

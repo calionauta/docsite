@@ -266,10 +266,19 @@ function rewriteMd(href, pageDir) {
   if (!path.endsWith(".md")) return href;
   const abs = resolve(DOCS, pageDir, path);
   const relToDocs = relative(DOCS, abs).split(sep).join("/");
-  if (relToDocs.startsWith("..")) return rewrite(href, pageDir);
-  // The .md files are emitted at the site root (<slug>.md), so a flat relative
-  // name is correct for every depth: docs/foo/bar.md -> <slug>.md.
-  return relToDocs.split("/").pop() + hash;
+  // Only a PUBLISHED page has a copy. Anything else under docs/ has no file at
+  // the site, so it becomes the GitHub blob URL the HTML page already links to
+  // — a copy that points at a sibling .md the build never emitted is a 404 that
+  // looks like a working link.
+  // The copies are named by SLUG, not by file name (`docs/research/index.md` is
+  // published as `research.md`), so the target is looked up rather than guessed
+  // from its basename.
+  const target = MANIFEST.find((x) => x.file === relToDocs);
+  if (relToDocs.startsWith("..") || !target) return rewrite(href, pageDir);
+  // Copies live at docs/<slug>.md. Relative to the copy being written, walk
+  // back to the site root and forward into docs/.
+  const up = "../".repeat((CUR_SLUG || "").split("/").length);
+  return `${up}docs/${target.slug}.md${hash}`;
 }
 
 function renderBody(md, pageDir, opts = {}) {
@@ -643,12 +652,18 @@ function check() {
   }
   // Pages deliberately kept repo-facing: they describe trees that no longer
   // exist (migration notes) or slices read while editing (domain cards).
-  const unpublished = config.unpublishedDirs || [];
+  const unpublishedDirs = config.unpublishedDirs || [];
+  const unpublishedFiles = config.unpublishedFiles || [];
+  const unpublished = (rel) => {
+    if (unpublishedFiles.includes(rel)) return true;
+    const base = dirname(rel) === "." ? "" : dirname(rel) + "/";
+    return unpublishedDirs.some((d) => rel === d || rel.startsWith(d) || base === d);
+  };
   const published = new Set(MANIFEST.map((p) => p.file));
   if (existsSync(DOCS)) for (const rel of walkMd(DOCS)) {
     if (published.has(rel)) continue;
-    if (unpublished.some((d) => rel.startsWith(d.endsWith("/") ? d : `${d}/`) || rel === d)) continue;
-    console.error(`docs/${rel} is neither published (manifest) nor declared (unpublishedDirs)`);
+    if (unpublished(rel)) continue;
+    console.error(`docs/${rel} is neither published (manifest) nor declared (unpublishedDirs / unpublishedFiles)`);
     failed++;
   }
   if (SEARCH_ENABLED) for (const rel of ["search/minisearch.js", "search/search.js"]) {
@@ -758,6 +773,39 @@ function markdownCopy(p) {
   return `# ${p.title}\n\n<!-- page: ${BASE}/docs/${p.slug}/ -->\n\n${toMarkdown(html).trim()}\n`;
 }
 
+// Lists back to markdown by walking the tag stream, so nesting is handled by a
+// stack instead of a regex that cannot see which list it is closing. A bullet
+// glued to the previous line by the SOURCE (`verbs.- describe`) stays one item
+// here on purpose: that is correct CommonMark, and the fix belongs in the
+// markdown, not in a heuristic that guesses where a list was meant to break.
+function toMarkdownLists(html) {
+  const stack = [];
+  let out = "";
+  let i = 0;
+  const TOKEN = /<\/?(ul|ol|li)>/g;
+  let m;
+  while ((m = TOKEN.exec(html)) !== null) {
+    out += html.slice(i, m.index);
+    i = m.index + m[0].length;
+    const [tag, name] = [m[0], m[1]];
+    if (name === "li") {
+      if (tag === "</li>") { out = out.replace(/\s+$/, ""); out += "\n"; continue; }
+      const depth = Math.max(stack.length - 1, 0);
+      const ordered = stack[stack.length - 1] === "ol";
+      const n = ordered ? (stack.count = (stack.count || 0) + 1) : 0;
+      out = out.replace(/\n+$/, "");
+      out += `${out && !out.endsWith("\n") ? "\n" : ""}${"  ".repeat(depth)}${ordered ? `${n}.` : "-"} `;
+      continue;
+    }
+    if (tag.startsWith("</")) { stack.pop(); out = out.replace(/\s+$/, "") + "\n"; continue; }
+    stack.push(name);
+    if (name === "ol") stack.count = 0;
+    out = out.replace(/\n+$/, "");
+    out += out && !out.endsWith("\n") ? "\n" : "";
+  }
+  return out + html.slice(i);
+}
+
 // Rendered HTML back to markdown: enough for the subset renderBody emits, and
 // one renderer instead of a second one that drifts from the page.
 function toMarkdown(html) {
@@ -773,8 +821,10 @@ function toMarkdown(html) {
   s = s.replace(/<(strong|em)>([\s\S]*?)<\/\1>/g, (_, tag, t) => (tag === "strong" ? `**${t}**` : `*${t}*`));
   s = s.replace(/<blockquote>([\s\S]*?)<\/blockquote>/g, (_, t) =>
     t.trim().split("\n").map((line) => `> ${line}`.trimEnd()).join("\n") + "\n");
+  // One emoji card is one bullet, so each ends with a newline: without it every
+  // card in a panel ran together on a single line (the whole architecture list).
   s = s.replace(/<div class="card"><span class="ic" aria-hidden="true">([\s\S]*?)<\/span><div class="card-body">([\s\S]*?)<\/div><\/div>/g,
-    (_, icon, t) => `- ${icon.trim()} ${t.trim()}`);
+    (_, icon, t) => `- ${icon.trim()} ${t.trim()}\n`);
   s = s.replace(/<div class="(cards|table-wrap)"[^>]*>/g, "").replace(/<\/div>/g, "");
   s = s.replace(/<table><thead><tr>([\s\S]*?)<\/tr><\/thead><tbody>([\s\S]*?)<\/tbody><\/table>/g, (_, head, body) => {
     const ths = [...head.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[1].trim());
@@ -784,13 +834,11 @@ function toMarkdown(html) {
     return [line(ths), line(ths.map(() => "---")), ...rows.map(line)].join("\n") + "\n";
   });
   // List items are adjacent in the HTML, so they have to be split before the
-  // `- ` markers go in or a three-item list collapses into one line.
-  s = s.replace(/<li>([\s\S]*?)<\/li>/g, (_, t) => `<li>${t.trim()}</li>\n`);
-  s = s.replace(/<ul>([\s\S]*?)<\/ul>/g, (_, t) => t.replace(/<li>([\s\S]*?)<\/li>\n/g, "- $1\n").trim());
-  s = s.replace(/<ol>([\s\S]*?)<\/ol>/g, (_, t) => {
-    let n = 0;
-    return t.replace(/<li>([\s\S]*?)<\/li>/g, (__, item) => `${++n}. ${item.trim()}`).trim();
-  });
+  // `- ` markers go in or a three-item list collapses into one line. Nested
+  // lists are why this is a scan and not three regexes: `<ul>([\s\S]*?)</ul>`
+  // stops at the FIRST closing tag, which truncates the outer list mid-item and
+  // glues the remainder to the next one (three real pages hit this).
+  s = toMarkdownLists(s);
   s = s.replace(/<p>([\s\S]*?)<\/p>/g, "$1\n");
   s = s.replace(/<hr>/g, "---");
   s = s.replace(/<[^>]+>/g, "");
@@ -830,8 +878,12 @@ function build() {
     const dir = join(OUT, "docs", p.slug);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "index.html"), pageShell(p.title, p.slug, body, nav, undefined, { desc: p.desc }));
-    // The markdown mirror is flat at the site root: <slug>.md.
-    writeFileSync(join(OUT, `${p.slug}.md`), markdownCopy(p));
+    // The markdown mirror sits beside its page's URL: docs/<slug>.md, so a
+    // nested slug (plugin/what-plugin-adds) still resolves relative to the
+    // page without a second lookup table.
+    const mdPath = join(OUT, "docs", `${p.slug}.md`);
+    mkdirSync(dirname(mdPath), { recursive: true });
+    writeFileSync(mdPath, markdownCopy(p));
   });
   // docs index
   let groups = "";
