@@ -90,7 +90,13 @@ for (const p of pages) if (!llms.includes(`/${p.slug}.md`)) bad(`llms.txt does n
 
 // The sitemap is where a search engine finds the copies.
 const sitemap = readFileSync(join(SITE, "sitemap.xml"), "utf8");
-for (const p of pages) if (!sitemap.includes(`/${p.slug}.md<`)) bad(`sitemap.xml omits ${p.slug}.md`);
+// The path is docs/<slug>.md, the same one the copy is written to: asserting a
+  // bare /<slug>.md here is what let the sitemap advertise a 404 for 79 pages
+  // while this test stayed green.
+  for (const p of pages) {
+    const want = `/docs/${p.slug}.md<`;
+    if (!sitemap.includes(want)) bad(`sitemap.xml omits ${want.slice(1, -1)}`);
+  }
 
 if (failures.length) {
   console.error(`\n${failures.length} markdown-mirror failure(s):`);

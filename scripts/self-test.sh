@@ -38,6 +38,22 @@ if node site/build.mjs --check >/dev/null 2>&1; then
 fi
 rm docs/orphan.md
 
+# A single repo-facing page has no directory of its own, so the declaration has
+# to accept a file name too — otherwise the only way to keep one page out of the
+# site is to move it into a directory or publish it.
+printf '# secret
+
+Internal only.
+' > docs/internal.md
+sed -i.bak 's|^  strictManifestLinks.*|&|; s|^  manifest: \[|  unpublishedFiles: ["internal.md"],\n  manifest: [|' site/docsite.config.mjs
+node site/build.mjs --check >/dev/null || {
+  echo "check() rejected a page declared through unpublishedFiles" >&2; exit 1; }
+sed -i.bak2 's|^  unpublishedFiles: \["internal.md"\],$||' site/docsite.config.mjs
+if node site/build.mjs --check >/dev/null 2>&1; then
+  echo "check() accepted an undeclared page after the declaration was removed" >&2; exit 1
+fi
+rm -f docs/internal.md site/docsite.config.mjs.bak site/docsite.config.mjs.bak2
+
 # Once the project keeps a curated llms.txt at the repo root, a published page
 # it never names is invisible to the agent that reads that file first.
 printf '# demo\n\n- [Demo docs](docs/intro.md)\n' > llms.txt
@@ -47,5 +63,5 @@ fi
 printf '# demo\n\n- [Demo docs](docs/intro.md)\n- [Tables](docs/tables.md)\n' > llms.txt
 node site/build.mjs --check >/dev/null || { echo "check() rejected a complete llms.txt" >&2; exit 1; }
 rm llms.txt
-echo "check rules ok: unpublished page and incomplete llms.txt both fail the build"
+echo "check rules ok: unpublished page, undeclared single page and incomplete llms.txt all fail; declared ones pass"
 node scripts/site-layout.test.mjs

@@ -933,7 +933,10 @@ function build() {
   const searchCount = SEARCH_ENABLED ? buildSearchIndex({ OUT, DOCS, MANIFEST }) : 0;
   // sitemap
   const releaseUrls = buildReleases({ ROOT, OUT, NAME, SOURCES: RELEASE_SOURCES, h: { esc, renderBody, pageShell }, meta: { desc: config.description } });
-  const urls = ["", "docs/", ...MANIFEST.map((p) => `docs/${p.slug}/`), ...MANIFEST.map((p) => `${p.slug}.md`), ...releaseUrls];
+  // The copies live at docs/<slug>.md, so the sitemap must say so: an entry for
+  // a path the build never wrote is a 404 advertised to a crawler.
+  const urls = ["", "docs/", ...MANIFEST.map((p) => `docs/${p.slug}/`),
+    ...MANIFEST.map((p) => `docs/${p.slug}.md`), ...releaseUrls];
   writeFileSync(join(OUT, "sitemap.xml"),
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     urls.map((u) => `  <url><loc>${BASE}/${u}</loc></url>`).join("\n") + `\n</urlset>\n`);
