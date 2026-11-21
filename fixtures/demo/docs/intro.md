@@ -16,3 +16,15 @@ to [the table page](tables.md), a list, and a quote.
 > A quote, to keep the blockquote path covered.
 
 See [the table page](tables.md#a-wide-table) for the table shapes.
+
+## Media and code
+
+An image, whose URL must survive the rewrite into the markdown copy:
+
+![A diagram](diagram.png)
+
+And a fenced block, which must come back out fenced:
+
+```go
+func main() { fmt.Println("hi") }
+```

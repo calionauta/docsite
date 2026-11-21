@@ -7,9 +7,10 @@ trap 'rm -rf "$work"' EXIT
 cp -R "$root/fixtures/demo/." "$work/"
 mkdir -p "$work/site/search" "$work/scripts"
 cp "$root/src/build.mjs" "$root/src/releases.mjs" "$root/src/search.mjs" "$work/site/"
+cp "$root/src/docsite.config.mjs" "$work/site/" 2>/dev/null || true
 cp "$root/src/search.js" "$work/site/search/search.js"
 cp "$root/src/vendor/minisearch.js" "$root/src/vendor/package.json" "$root/src/vendor/MINISEARCH-LICENSE.txt" "$work/site/search/"
-cp "$root/src/site-layout.test.mjs" "$work/scripts/"
+cp "$root/src/site-layout.test.mjs" "$root/src/markdown-mirror.test.mjs" "$work/scripts/"
 cd "$work"
 node site/build.mjs
 node -e '
@@ -24,4 +25,27 @@ const results = index.search("tabel", { prefix: true, fuzzy: 0.3 });
 if (!results.length) { console.error("search self-test: no fuzzy result for tabel"); process.exit(1); }
 console.log(`search ok: ${results.length} fuzzy result(s)`);
 '
+# The markdown mirror is a build-artifact contract; it runs before the browser
+# pass so a broken copy fails fast and without needing Chromium.
+node scripts/markdown-mirror.test.mjs "$work"
+
+# ...and the two rules that protect it, each proved by making the build fail.
+# A page nobody publishes and nobody declares reaches no reader: the build must
+# refuse it rather than publish 80 pages and stay quiet about the 81st.
+printf '# orphan\n\nNobody links this.\n' > docs/orphan.md
+if node site/build.mjs --check >/dev/null 2>&1; then
+  echo "check() accepted an unpublished, undeclared page" >&2; exit 1
+fi
+rm docs/orphan.md
+
+# Once the project keeps a curated llms.txt at the repo root, a published page
+# it never names is invisible to the agent that reads that file first.
+printf '# demo\n\n- [Demo docs](docs/intro.md)\n' > llms.txt
+if node site/build.mjs --check >/dev/null 2>&1; then
+  echo "check() accepted a page missing from the curated llms.txt" >&2; exit 1
+fi
+printf '# demo\n\n- [Demo docs](docs/intro.md)\n- [Tables](docs/tables.md)\n' > llms.txt
+node site/build.mjs --check >/dev/null || { echo "check() rejected a complete llms.txt" >&2; exit 1; }
+rm llms.txt
+echo "check rules ok: unpublished page and incomplete llms.txt both fail the build"
 node scripts/site-layout.test.mjs
